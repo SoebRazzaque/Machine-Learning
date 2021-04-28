@@ -1,0 +1,88 @@
+---
+title: "Practical Machine Learning Week 4 Project"
+author: "SR"
+date: "04/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo = TRUE}
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(lattice)
+library(ggplot2)
+library(rattle)
+```
+
+## Summary of analysis
+
+This project is to study data from accelerometers on the belts, forearms and arms of six participants, and on the dumbells to determine how well they perform lifting dumbells. To provide input information, the participants were asked to perform lifting correctly and incorrectly in 5 different ways. The goal of this project is to predict the manner in which they did the exercise.
+
+## Loading and cleaning data
+
+Load the training and test data sets and remove the NA,#DIV/0! and blank values in the data. Then the datasets were subsetted to remove columns 1-7 with irrelevant information.
+
+```{r echo = TRUE}
+training_data <- read.csv('pml-training.csv', na.strings = c("NA", "#DIV/0!", ""))
+testing_data <- read.csv('pml-testing.csv', na.strings = c("NA", "#DIV/0!", ""))
+dim(training_data)
+dim(testing_data)
+training_data <- training_data[,colSums(is.na(training_data)) == 0]
+testing_data <- testing_data[,colSums(is.na(testing_data)) == 0]
+clean_training_data <- training_data[,-c(1:7)]
+clean_testing_data <- testing_data[,-c(1:7)]
+dim(clean_training_data)
+dim(clean_testing_data)
+```
+
+## Partition data for cross validation 
+
+Split the training data set into 75% and 25% sub sets for training and cross-validation purpose. 
+
+```{r echo = TRUE}
+inTrainIndex <- createDataPartition(clean_training_data$classe, p=0.75, list=FALSE)
+training_training_data <- clean_training_data[inTrainIndex,]
+training_crossval_data <- clean_training_data[-inTrainIndex,]
+dim(training_training_data)
+dim(training_crossval_data)
+```
+
+## Machine learning exploratory analysis
+
+Using the Decision Tree we look at the 5 different ways (A,B,C,D,E) of lifting the dumbbells. It appears that not much can be learned from it.   
+
+```{r echo = TRUE}
+decisionTreeMod <- train(classe ~., method='rpart', data=training_training_data)
+rpart.plot(decisionTreeMod$finalModel)
+#decisionTreePrediction <- predict(decisionTreeMod, training_crossval_data)
+#confusionMatrix(training_crossval_data$classe, decisionTreePrediction)
+```
+
+## Machine learning with Random Forest
+
+Next we apply the Random Forest algorithm on the training data set and select the best model.
+
+```{r echo = TRUE}
+RFcontrol <- trainControl(method="cv", number=3, verboseIter=FALSE)
+RFfitMod  <- train(classe ~ ., data=training_training_data, method="rf",
+                          trControl=RFcontrol)
+RFfitMod$finalModel
+```
+
+Now we use prediction model on the cross-validation data with confusion matrix
+
+```{r echo = TRUE}
+RFpredict <- predict(RFfitMod, newdata=training_crossval_data)
+```
+
+## Prediction on test data set
+
+```{r echo = TRUE}
+predict(RFfitMod, clean_testing_data)
+```
+
